@@ -35,7 +35,7 @@ class User(models.Model):
         hashed_password = hashlib.sha256(password.encode()).hexdigest()
         return hashed_password
 
-    def save(self, *args, **kwargs):
+    def save_password(self, *args, **kwargs):
         # Hash the password before saving
         if self.password:
             self.password = self.make_password(self.password)
