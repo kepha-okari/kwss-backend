@@ -48,3 +48,52 @@ class User(models.Model):
 
     def __str__(self):
         return self.username
+
+
+class Reading(models.Model):
+    """
+    Represents a reading for a meter at a specific date.
+
+    Key Fields:
+    - meter: ForeignKey to the Meter model representing the meter associated with the reading.
+    - reading_date: DateField representing the date of the reading.
+    - meter_reading: DecimalField representing the meter reading value.
+    - status: IntegerField representing the status of the reading (0 for 'Pending', 1 for 'Closed').
+    - read_sequence: IntegerField representing the read sequence (1 for 'Pending', 2 for 'Closed' for automating and reconciling invoices).
+    - date_inserted: DateTimeField representing the date when the record was inserted to the db.
+    """
+
+    STATUS_CHOICES = [
+        (0, 'Pending'),
+        (1, 'Closed'),
+    ]
+
+    meter = models.ForeignKey('Meter', on_delete=models.CASCADE)
+    reading_date = models.DateField()
+    meter_reading = models.DecimalField(max_digits=10, decimal_places=4)
+    status = models.IntegerField(choices=STATUS_CHOICES)
+    read_sequence = models.IntegerField(default=1)
+    date_inserted = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        """
+        Overrides the save method to update the read_sequence field to 2 automatically
+        when the status changes to 'Closed' (1).
+        """
+        if self.status == 1 and self.read_sequence == 1:
+            self.read_sequence = 2
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        """
+        Returns a string representation of the reading.
+        """
+        return f"Reading #{self.pk} - Reading: {self.meter_reading}, Date Read: {self.reading_date}, Status: {self.get_status_display()}, Sequence: {self.read_sequence}"
+
+
+    class Meta:
+        """
+        Meta class for the Reading model.
+        """
+        ordering = ['-reading_date']
+
