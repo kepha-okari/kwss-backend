@@ -77,25 +77,15 @@ class Reading(models.Model):
     date_inserted = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
-        """
-        Overrides the save method to update the read_sequence field to 2 automatically
-        when the status changes to 'Closed' (1).
-        """
         if self.status == 1 and self.read_sequence == 1:
             self.read_sequence = 2
         super().save(*args, **kwargs)
 
     def __str__(self):
-        """
-        Returns a string representation of the reading.
-        """
         return f"Reading #{self.pk} - Reading: {self.meter_reading}, Date Read: {self.reading_date}, Status: {self.get_status_display()}, Sequence: {self.read_sequence}"
 
 
     class Meta:
-        """
-        Meta class for the Reading model.
-        """
         ordering = ['-reading_date']
 
 
@@ -114,9 +104,6 @@ class Invoice(models.Model):
     date_created = models.DateField(auto_now_add=True)
 
     def __str__(self):
-        """
-        Returns a string representation of the invoice.
-        """
         return f"Invoice #{self.pk} - Member: {self.member}, Status: {self.get_status_display()}"
 
     def save(self, *args, **kwargs):
@@ -133,18 +120,12 @@ class Invoice(models.Model):
         super().save(*args, **kwargs)
 
     def calculate_usage(self):
-        """
-        Calculates the usage based on the current and previous readings.
-        """
         if self.current_reading and self.previous_reading and self.previous_reading != 0:
             usage = self.current_reading.meter_reading - self.previous_reading.meter_reading
             return usage if usage >= 0 else 0
         return 0
 
     def calculate_total_amount(self):
-        """
-        Calculates the total amount for the invoice based on usage and standing charges.
-        """
         usage = self.calculate_usage()
         total_amount = usage * self.member.meter.tariff_rate + self.standing_charges
         return total_amount
