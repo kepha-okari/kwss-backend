@@ -97,3 +97,40 @@ class Reading(models.Model):
         """
         ordering = ['-reading_date']
 
+
+
+class Invoice(models.Model):
+    STATUS_CHOICES = [
+        (0, 'Outstanding'),
+        (1, 'Settled'),
+    ]
+
+    member = models.ForeignKey('Member', on_delete=models.CASCADE)
+    current_reading = models.ForeignKey('Reading', on_delete=models.CASCADE, related_name='current_invoices')
+    previous_reading = models.ForeignKey('Reading', on_delete=models.CASCADE, related_name='previous_invoices')
+    standing_charges = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.IntegerField(choices=STATUS_CHOICES)
+    date_created = models.DateField(auto_now_add=True)
+
+    def __str__(self):
+        """
+        Returns a string representation of the invoice.
+        """
+        return f"Invoice #{self.pk} - Member: {self.member}, Status: {self.get_status_display()}"
+
+    def calculate_usage(self):
+        """
+        Calculates the usage based on the current and previous readings.
+        """
+        if self.current_reading and self.previous_reading:
+            usage = self.current_reading.meter_reading - self.previous_reading.meter_reading
+            return usage if usage >= 0 else 0
+        return 0
+
+    def calculate_total_amount(self):
+        """
+        Calculates the total amount for the invoice based on usage and standing charges.
+        """
+        usage = self.calculate_usage()
+        total_amount = usage * self.member.meter.tariff_rate + self.standing_charges
+        return total_amount
