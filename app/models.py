@@ -71,6 +71,7 @@ class Reading(models.Model):
     meter = models.ForeignKey('Meter', on_delete=models.CASCADE)
     reading_date = models.DateField()
     meter_reading = models.DecimalField(max_digits=10, decimal_places=4)
+    tariff_rate = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.IntegerField(choices=STATUS_CHOICES)
     read_sequence = models.IntegerField(default=1)
     date_inserted = models.DateTimeField(auto_now_add=True)
@@ -107,7 +108,7 @@ class Invoice(models.Model):
 
     member = models.ForeignKey('Member', on_delete=models.CASCADE)
     current_reading = models.ForeignKey('Reading', on_delete=models.CASCADE, related_name='current_invoices')
-    previous_reading = models.ForeignKey('Reading', on_delete=models.CASCADE, related_name='previous_invoices')
+    previous_reading = models.ForeignKey('Reading', on_delete=models.CASCADE, related_name='previous_invoices', null=True, default=0)
     standing_charges = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.IntegerField(choices=STATUS_CHOICES)
     date_created = models.DateField(auto_now_add=True)
@@ -118,11 +119,24 @@ class Invoice(models.Model):
         """
         return f"Invoice #{self.pk} - Member: {self.member}, Status: {self.get_status_display()}"
 
+    def save(self, *args, **kwargs):
+        """
+        Overrides the save method to set the current and previous readings automatically based on status.
+        """
+        if not self.pk:  # Only perform this logic when creating a new invoice
+            try:
+                self.current_reading = Reading.objects.filter(meter=self.member.meter, status=0).latest('reading_date')
+                self.previous_reading = Reading.objects.filter(meter=self.member.meter, status=1).latest('reading_date')
+            except Reading.DoesNotExist:
+                self.previous_reading = 0  # Set previous_reading to 0 if no previous reading is found
+
+        super().save(*args, **kwargs)
+
     def calculate_usage(self):
         """
         Calculates the usage based on the current and previous readings.
         """
-        if self.current_reading and self.previous_reading:
+        if self.current_reading and self.previous_reading and self.previous_reading != 0:
             usage = self.current_reading.meter_reading - self.previous_reading.meter_reading
             return usage if usage >= 0 else 0
         return 0
