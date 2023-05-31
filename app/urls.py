@@ -1,12 +1,17 @@
-from django.urls import include, path
-from rest_framework import routers
-from .views import MemberViewSet, ReadingViewSet, InvoiceViewSet
 
-router = routers.DefaultRouter()
-router.register('members', MemberViewSet)
-router.register('readings', ReadingViewSet)
-router.register('invoices', InvoiceViewSet)
+from django.urls import path
+from .views import MemberAPIView, MemberDetailAPIView
 
 urlpatterns = [
-    path('', include(router.urls)),
+    path('members/', MemberAPIView.as_view(), name='members'),
+    path('members/<int:pk>/', MemberDetailAPIView.as_view(), name='member-detail'),
 ]
+
+# from django.urls import path
+# from .views import MemberAPIView
+
+# urlpatterns = [
+#     path('members/', MemberAPIView.as_view(), name='member-list'),
+# ]
+
+
