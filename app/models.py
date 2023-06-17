@@ -1,11 +1,16 @@
 import hashlib
 from django.db import models
+import re
+from django.db.models import Max
 
 class Meter(models.Model):
     meter_number = models.CharField(max_length=20, unique=True)
+    tariff_rate = models.DecimalField(max_digits=10, decimal_places=2, default=150.00)
+
 
 class Member(models.Model):
     name = models.CharField(max_length=100)
+    member_number = models.CharField(max_length=10,blank=True, default='CZ')
     address = models.CharField(max_length=200)
     phone_number = models.CharField(max_length=15, blank=False)
     id_number = models.CharField(max_length=20)
@@ -15,6 +20,26 @@ class Member(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.member_number:
+            self.member_number = self.generate_member_number()
+
+        super().save(*args, **kwargs)
+
+    def generate_member_number(self):
+        last_member = Member.objects.order_by('-id').first()
+        last_numeric_part = 0
+        if last_member:
+            match = re.search(r'\d+', last_member.member_number)
+            if match:
+                last_numeric_part = int(match.group())
+
+        new_numeric_part = last_numeric_part + 1
+        member_number = f'C{new_numeric_part}'
+        return member_number
+ 
+
 
 class User(models.Model):
 
@@ -72,13 +97,16 @@ class Reading(models.Model):
     reading_date = models.DateField()
     meter_reading = models.DecimalField(max_digits=10, decimal_places=4)
     tariff_rate = models.DecimalField(max_digits=10, decimal_places=2)
-    status = models.IntegerField(choices=STATUS_CHOICES)
+    status = models.IntegerField(choices=STATUS_CHOICES, default=0)
     read_sequence = models.IntegerField(default=1)
     date_inserted = models.DateTimeField(auto_now_add=True)
+
 
     def save(self, *args, **kwargs):
         if self.status == 1 and self.read_sequence == 1:
             self.read_sequence = 2
+        member_tariff_rate = self.meter.tariff_rate
+        self.tariff_rate = member_tariff_rate if member_tariff_rate else 150
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -90,13 +118,53 @@ class Reading(models.Model):
 
 
 
+# class Invoice(models.Model):
+#     STATUS_CHOICES = [
+#         (0, 'Outstanding'),
+#         (1, 'Settled'),
+#     ]
+
+#     meter = models.ForeignKey('Meter', default=None, on_delete=models.CASCADE)
+#     current_reading = models.ForeignKey('Reading', on_delete=models.CASCADE, related_name='current_invoices')
+#     previous_reading = models.ForeignKey('Reading', on_delete=models.CASCADE, related_name='previous_invoices', null=True, default=0)
+#     standing_charges = models.DecimalField(max_digits=10, decimal_places=2)
+#     status = models.IntegerField(choices=STATUS_CHOICES)
+#     date_created = models.DateField(auto_now_add=True)
+
+#     def __str__(self):
+#         return f"Invoice #{self.pk} - Member: {self.member}, Status: {self.get_status_display()}"
+
+#     def save(self, *args, **kwargs):
+#         """
+#         Overrides the save method to set the current and previous readings automatically based on status.
+#         """
+#         if not self.pk:  # Only perform this logic when creating a new invoice
+#             try:
+#                 self.current_reading = Reading.objects.filter(meter=self.member.meter, status=0).latest('reading_date')
+#                 self.previous_reading = Reading.objects.filter(meter=self.member.meter, status=1).latest('reading_date')
+#             except Reading.DoesNotExist:
+#                 self.previous_reading = 0  # Set previous_reading to 0 if no previous reading is found
+
+#         super().save(*args, **kwargs)
+
+#     def calculate_usage(self):
+#         if self.current_reading and self.previous_reading and self.previous_reading != 0:
+#             usage = self.current_reading.meter_reading - self.previous_reading.meter_reading
+#             return usage if usage >= 0 else 0
+#         return 0
+
+#     def calculate_total_amount(self):
+#         usage = self.calculate_usage()
+#         total_amount = usage * self.member.meter.tariff_rate + self.standing_charges
+#         return total_amount
+
 class Invoice(models.Model):
     STATUS_CHOICES = [
         (0, 'Outstanding'),
         (1, 'Settled'),
     ]
 
-    member = models.ForeignKey('Member', on_delete=models.CASCADE)
+    meter = models.ForeignKey('Meter', default=None, on_delete=models.CASCADE)
     current_reading = models.ForeignKey('Reading', on_delete=models.CASCADE, related_name='current_invoices')
     previous_reading = models.ForeignKey('Reading', on_delete=models.CASCADE, related_name='previous_invoices', null=True, default=0)
     standing_charges = models.DecimalField(max_digits=10, decimal_places=2)
@@ -104,7 +172,7 @@ class Invoice(models.Model):
     date_created = models.DateField(auto_now_add=True)
 
     def __str__(self):
-        return f"Invoice #{self.pk} - Member: {self.member}, Status: {self.get_status_display()}"
+        return f"Invoice #{self.pk} - Meter: {self.meter}, Status: {self.get_status_display()}"
 
     def save(self, *args, **kwargs):
         """
@@ -112,8 +180,8 @@ class Invoice(models.Model):
         """
         if not self.pk:  # Only perform this logic when creating a new invoice
             try:
-                self.current_reading = Reading.objects.filter(meter=self.member.meter, status=0).latest('reading_date')
-                self.previous_reading = Reading.objects.filter(meter=self.member.meter, status=1).latest('reading_date')
+                self.current_reading = Reading.objects.filter(meter=self.meter, status=0).latest('reading_date')
+                self.previous_reading = Reading.objects.filter(meter=self.meter, status=1).latest('reading_date')
             except Reading.DoesNotExist:
                 self.previous_reading = 0  # Set previous_reading to 0 if no previous reading is found
 
@@ -127,5 +195,5 @@ class Invoice(models.Model):
 
     def calculate_total_amount(self):
         usage = self.calculate_usage()
-        total_amount = usage * self.member.meter.tariff_rate + self.standing_charges
+        total_amount = usage * self.meter.tariff_rate + self.standing_charges
         return total_amount

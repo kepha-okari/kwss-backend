@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.exceptions import NotFound
 from rest_framework import status
 from app.models import Member, Meter, Reading, Invoice
-from app.serializers import MemberSerializer, MeterSerializer, ReadingSerializer, InvoiceSerializer
+from app.serializers import MemberSerializer, MemberCreateSerializer, MeterSerializer, ReadingSerializer, ReadingCreateSerializer, InvoiceSerializer
 
 class MemberAPIView(APIView):
     def get(self, request):
@@ -14,9 +14,17 @@ class MemberAPIView(APIView):
     def post(self, request):
         serializer = MemberSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                # Save the serializer data to the database
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                # Return an error response
+                return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            # Return a validation error response
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class MemberDetailAPIView(APIView):
     def get_object(self, pk):
@@ -24,6 +32,7 @@ class MemberDetailAPIView(APIView):
             return Member.objects.get(pk=pk)
         except Member.DoesNotExist:
             raise status.HTTP_404_NOT_FOUND
+        
 
     def get(self, request, pk):
         member = self.get_object(pk)
@@ -62,7 +71,7 @@ class MeterAPIView(APIView):
         if serializer.is_valid():
             try:
                 # Save the serializer data to the database
-                invoice = serializer.save()
+                serializer.save()
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             except Exception as e:
                 # Return an error response
@@ -117,12 +126,21 @@ class MemberAPIView(APIView):
     #         return Response(serializer.data, status=status.HTTP_201_CREATED)
     #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+
     def post(self, request):
-        serializer = MemberSerializer(data=request.data)
+        serializer = MemberCreateSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=201)
-        return Response(serializer.errors, status=400)
+            try:
+                # Save the serializer data to the database
+                invoice = serializer.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                # Return an error response
+                return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            # Return a validation error response
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class MemberDetailAPIView(APIView):
     def get_object(self, pk):
@@ -211,13 +229,20 @@ class ReadingListAPIView(APIView):
         serializer = ReadingSerializer(readings, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def post(self, request):
-        serializer = ReadingSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    def post(self, request):
+        serializer = ReadingCreateSerializer(data=request.data)
+        if serializer.is_valid():
+            try:
+                # Save the serializer data to the database
+                invoice = serializer.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                # Return an error response
+                return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            # Return a validation error response
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class ReadingDetailAPIView(APIView):
     def get_object(self, pk):
